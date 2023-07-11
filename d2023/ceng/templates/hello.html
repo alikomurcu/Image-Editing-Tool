@@ -1,0 +1,124 @@
+{% extends 'home.html' %}
+{% block 'main' %}
+    <p><strong> A Graph Based Image Editing Tool {{post.name}} {{post.surname}} </strong></p>
+<!--    create a logout button at the top right-->
+    <form action="/logout" method="post">
+        {% csrf_token %}
+        <input type="submit" value="Logout">
+    </form>
+
+    Add a new graph:
+    <form action="/newgraph" method="post">
+        {% csrf_token %}
+        Name <input type="text" name="name">
+        <label for="graphtype">Graph Type:</label>
+        <select id="graphtype" name="graphtype" >
+            <option value="rw">Read-Write</option>
+            <option value="r">Read-Only</option>
+        </select>
+        <input type="submit" value="Send">
+    </form>
+
+<!--add a button to redirect home -->
+
+
+    <form action="/list" method="post">
+    <input type="submit" value="List Graphs">
+<!--        add a button to hide graphs-->
+        {% csrf_token %}
+    <ul>
+
+    <strong> Graphs </strong> <br/>
+    {% for g in graphs %}
+       <li> {{g.name}} <br/>
+    </li>
+    {% endfor %}
+    </ul>
+    </form>
+    <br>
+    <form action="/home" method="post">
+        {% csrf_token %}
+        <input type="submit" value="Hide Graphs">
+    </form>
+
+<!-- take pne input to open a graph -->
+    <form action="/opengraph" method="post">
+        {% csrf_token %}
+        <input type="text" name="graphname" placeholder="Graph Name"><br/>
+        <input type="submit" value="Open">
+    </form>
+
+    Add a new node:
+    <form action="/newnode" method="post">
+        {% csrf_token %}
+        <label for="components">Component Type:</label>
+        <select id="components" name="components" >
+            <option value="1">Load Image</option>
+            <option value="2">Crop</option>
+            <option value="3">Get Dimensions</option>
+            <option value="4">Rotate</option>
+            <option value="5">Stack</option>
+            <option value="6">HStack</option>
+            <option value="7">Scale</option>
+            <option value="8">Fit</option>
+            <option value="9">Stretch</option>
+            <option value="10">Save Image</option>
+            <option value="11">View Image</option>
+            <option value="12">Dup Image</option>
+        </select>
+        <input type="submit" value="Choose">
+    </form>
+
+    <br/>
+    Selected component ID:{{ cid }}
+    <br/>
+
+
+    <form action="/newnode/nodeparams" method="post">
+        <input type="hidden" name="cid" value={{cid}}>
+        {% csrf_token %}
+    {% for i in inputs %}
+        {{i}} <input type="text" name={{i}}><br/>
+    {% endfor %}
+    <br/>
+    <input type="submit" value="Send">
+    </form>
+<!-- See list of nodes -->
+    <form action="/listnodes" method="post">
+        {% csrf_token %}
+        <input type="submit" value="List Nodes">
+        <ul>
+            <strong> Nodes </strong> <br/>
+            {% for n in nodes %}
+            <li> nodeid:{{n.id}}  nodetype:{{n.component}} <br/>
+            </li>
+            {% endfor %}
+        </ul>
+    </form>
+
+<!-- create two input boxes to connect nodes -->
+    Connect two nodes:
+    <form action="/connectnodes" method="post">
+        {% csrf_token %}
+        <input type="text" name="node1" placeholder="Node 1"><br/>
+        <input type="text" name="node2" placeholder="Node 2"><br/>
+        <input type="submit" value="Connect">
+    </form>
+
+    Execute the graph:
+    <form action="/execute" method="post">
+        {% csrf_token %}
+        <input type="submit" value="Execute">
+    </form>
+
+
+<!--    Ask a new question:-->
+<!--    <form action="/newq" method="post">-->
+<!--        {% csrf_token %}-->
+<!--        Name <input type="text" name="name">-->
+<!--        Surname <input type="text" name="surname">-->
+<!--        Text <textarea name="text">-->
+<!--        </textarea>-->
+<!--        <input type="submit" value="Send">-->
+<!--    </form>-->
+{% endblock %}

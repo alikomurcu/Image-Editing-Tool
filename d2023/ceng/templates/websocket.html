@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html>
+{% load static %}
+<head>
+	<title>Graph Based Image Editor</title>
+    <form action="/logout" method="post">
+        {% csrf_token %}
+        <input type="submit" value="Logout">
+    </form>
+	<!-- CSS CUSTOM -->
+	<link rel="stylesheet" href="{% static 'styles.css' %}">
+	<script>
+		class Ws {
+			constructor(ipport) {
+				this.socket = undefined;
+				this.ipport = ipport;
+				this.createwebsocket();
+			}
+			createwebsocket() {
+				var status = document.getElementById('status');
+				if (this.socket)	// if already connected close it and reopen
+					this.socket.close();
+
+				var socket = new WebSocket('ws://' + this.ipport);
+				socket.onopen = function () {
+					// send id list for notifications
+					var username = document.getElementById('username').value;
+					status.textContent = 'Connected ' + username;
+					status.setAttribute('style', 'background-color: #a0ffa0');
+					ws.socket.send(JSON.stringify({
+						"type": "connection_establish",
+						"username": username
+					}));
+				}
+				socket.onerror = function () {
+					console.log("error");
+					status.textContent = 'Connection failed';
+					status.setAttribute('style', 'background-color: #ffa0a0');
+				}
+				socket.onclose = function () {
+					console.log("closed");
+					status.textContent = 'Connection closed';
+					status.setAttribute('style', 'background-color: #ffa0a0');
+					ws.socket = undefined;
+					setTimeout(() => {
+						if (!ws.socket) {
+							ws.createwebsocket();
+						}
+					}, 5000);
+				}
+				socket.onmessage = function wseventhandler(event) {
+					var messages = event.data;
+					console.log("your messsage", messages)
+					var message = JSON.parse(messages);
+					if (!message['success'] &&
+						!["newnode_result", "connect_result",
+						  "open_result", "nodes_result",
+						"attach_result"].includes(message.type))
+					{
+						alert(message.message)
+						return;	// if not success, do nothing
+					}
+					if (message.type === "update")
+                    {
+                        if(is_list_graphs)
+                        {
+                            // update graph list
+                            var graphs = message['graph_list'];
+                            var list = document.getElementById("graphList");
+                            // list.innerHTML = "";
+                            // remove the children of list
+                            while (list.firstChild) {
+                                list.removeChild(list.firstChild);
+                            }
+                            for (var i = 0; i < graphs.length; i++) {
+                                var li = document.createElement("li");
+                                li.appendChild(document.createTextNode(graphs[i]));
+                                list.appendChild(li);
+                            }
+                        }
+
+                        if (is_list_nodes)
+                        {
+                            // update node list for the graph
+                            var graph_node_names = message['graph_node_names'];
+                            nodes = graph_node_names[this.active_graph_name];
+                            var list = document.getElementById("nodeList");
+                            while (list.firstChild) {
+                                list.removeChild(list.firstChild);
+                            }
+                            for (let key in nodes) {
+                                var li = document.createElement("li");
+                                li.appendChild(document.createTextNode("Node Id: "+ key + " - " + nodes[key]));
+                                list.appendChild(li);
+                            }
+                        }
+                    }
+					else if (message.type === "notify"){
+                        // notify table update
+                        var attachments = message['attachments'];
+                        if (Object.keys(attachments).length > 0){
+                            var notifications = document.getElementById('notifications');
+                            var username = document.getElementById('username').value;
+                            for( var key in attachments){
+                                if(attachments[key].includes(username)){
+                                    var new_elem = document.createElement('li');
+                                    new_elem.innerHTML = key + " ," + attachments[key].slice(-1)[0];
+                                    notifications.appendChild(new_elem);
+                                }
+                            }
+                        }
+					}
+                    else if (message.type === "list_result") {
+						if (message.success)
+						{
+							var graphs = message['graph_list'];
+							var list = document.getElementById("graphList");
+							if (!is_list_graphs)
+							{
+								list.innerHTML = "";
+								return;
+							}
+
+							// list.innerHTML = "";
+							// remove the children of list
+							while (list.firstChild) {
+								list.removeChild(list.firstChild);
+							}
+							for (var i = 0; i < graphs.length; i++) {
+								var li = document.createElement("li");
+								li.appendChild(document.createTextNode(graphs[i]));
+								list.appendChild(li);
+							}
+						}
+						else {
+							alert("Something went wrong")
+						}
+					}
+                    else if (message.type === "attachments_result") {
+						var attachments = message['attachment_list'];
+						var list = document.getElementById("attachmentList");
+						if (!is_list_attachments)
+						{
+							list.innerHTML = "";
+							return;
+						}
+						while (list.firstChild) {
+							list.removeChild(list.firstChild);
+						}
+						for (var i = 0; i < attachments.length; i++) {
+							var li = document.createElement("li");
+							li.appendChild(document.createTextNode(attachments[i]));
+							list.appendChild(li);
+						}
+                    }
+					else if (message.type === "attach_result")
+					{
+						if (!message.success) alert("You must add this graph first.")
+					}
+                    else if (message.type === "nodes_result")
+                    {
+						if (message.success)
+						{
+							var nodes = message['node_id_names'];
+							var list = document.getElementById("nodeList");
+							if (!is_list_nodes)
+							{
+								list.innerHTML = "";
+								return;
+							}
+							while (list.firstChild) {
+								list.removeChild(list.firstChild);
+							}
+							for (let key in nodes) {
+								var li = document.createElement("li");
+								li.appendChild(document.createTextNode("Node Id: "+ key + " - " + nodes[key]));
+								list.appendChild(li);
+							}
+						}
+						else{
+							alert("You should open this graph first")
+						}
+                    }
+					else if (message.type === "new_result") {
+                        var a = 5;
+					}
+					else if (message.type === "open_result") {
+                        if (message.success) {
+                            this.active_graph_name = message['graphname'];
+                            var openclosebuttons = document.getElementById("openclosebuttons");
+                            if (openclosebuttons.childElementCount == 1) {
+                                var closebutton = document.createElement("button");
+                                closebutton.setAttribute('onclick','closeGraph()');
+                                closebutton.innerHTML = 'Close';
+                                openclosebuttons.appendChild(closebutton);
+                            }
+                        }
+						else{
+							alert("You should attach this graph first");
+						}
+					}
+                    else if (message.type === "execute_result") {
+                        if (message['method'] === 'save') {
+                            var decodedData = atob(message['image']);
+                            var bytes = new Uint8Array(decodedData.length);
+                            for (var i = 0; i < decodedData.length; i++) {
+                              bytes[i] = decodedData.charCodeAt(i);
+                            }
+                            var blob = new Blob([bytes.buffer]);
+                            var imageUrl = URL.createObjectURL(blob);
+
+                            // Create a download button
+                            var downloadButton = document.createElement("button");
+                            downloadButton.textContent = "Download Image";
+                            downloadButton.addEventListener("click", function() {
+                              // Create a temporary anchor element
+                              var anchor = document.createElement("a");
+                              anchor.href = imageUrl;
+                              anchor.download = "generated_image.png";
+                              anchor.click();
+
+                              // Clean up the temporary anchor element
+                              setTimeout(function() {
+                                URL.revokeObjectURL(anchor.href);
+                                anchor.remove();
+                              }, 0);
+                            });
+
+                            // Append the download button to the document
+                            document.body.appendChild(downloadButton);
+                        }
+                        else if (message['method'] === 'view') {
+                            var decodedData = atob(message['image']);
+                            var bytes = new Uint8Array(decodedData.length);
+                            for (var i = 0; i < decodedData.length; i++) {
+                                bytes[i] = decodedData.charCodeAt(i);
+                            }
+                            var blob = new Blob([bytes.buffer]);
+                            var imageUrl = URL.createObjectURL(blob);
+                            var img = new Image();
+                            img.src = imageUrl;
+                            var img_header = document.createElement("strong");
+                            img_header.innerHTML = 'GENERATED IMAGE';
+                            document.body.appendChild(img_header);
+                            var img_header2 = document.createElement("div");
+                            document.body.appendChild(img_header2);
+                            document.body.appendChild(img);
+                        }
+
+                    }
+					else if (message.type === "newnode_result" && !message.success) {
+						alert("You should open a graph to create a newnode");
+					}
+					else if (message.type === "connect_result" && !message.success){
+						alert("You should open a graph to connect nodes");
+					}
+					else if (message.type === "error") {
+						alert(message.message);
+					}
+				}
+
+                function updateGraphList(message)
+                {
+                    var graphs = message['graph_list'];
+                    var list = document.getElementById("graphList");
+                    // list.innerHTML = "";
+                    // remove the children of list
+                    while (list.firstChild) {
+                        list.removeChild(list.firstChild);
+                    }
+                    for (var i = 0; i < graphs.length; i++) {
+                        var li = document.createElement("li");
+                        li.appendChild(document.createTextNode(graphs[i]));
+                        list.appendChild(li);
+                    }
+                }
+
+                function updateNodeList(message)
+                {
+                    var nodes = message['node_id_names'];
+                    var list = document.getElementById("nodeList");
+                    while (list.firstChild) {
+                        list.removeChild(list.firstChild);
+                    }
+                    for (let key in nodes) {
+                        var li = document.createElement("li");
+                        li.appendChild(document.createTextNode(key + " " + nodes[key]));
+                        list.appendChild(li);
+                    }
+                }
+				this.socket = socket
+			}
+		}
+		window.onload = function () {
+			ws = new Ws('127.0.0.1:1423');
+            this.active_graph_name = "";
+            is_list_graphs = false;
+            is_list_nodes = false;
+            is_list_attachments = false;
+		}
+	</script>
+</head>
+
+<body>
+	<div style="width:300px;display:inline-block;vertical-align:top">
+		<div id="status" style="background-color: #ffa0a0;">not connected</div>
+<!--		create a hidden text-->
+                {% csrf_token %}
+		<input type="hidden" name="username" id="username" value='{{ username }}'>
+	</div>
+
+	<div>
+        {% csrf_token %}
+		Add a new graph: <br>
+			Name <input type="text" name="addgraph">
+	<!-- add a button with onclick method -->
+		<button onclick="addGraph()">Add Graph</button>
+		<script>
+			function addGraph() {
+				var name = document.getElementsByName("addgraph")[0].value;
+				var graph = {
+					"graphname": name,
+					"type": "new"
+				};
+				ws.socket.send(JSON.stringify(graph));
+			}
+		</script>
+	</div>
+
+    <div>
+        {% csrf_token %}
+		Attach a new graph: <br>
+			Name <input type="text" name="attachgraph">
+			<label for="graphmode">Graph Mode:</label>
+			<select id="graphmode" name="graphmode" >
+				<option value="rw">Read-Write</option>
+				<option value="r">Read-Only</option>l
+			</select>
+	<!-- add a button with onclick method -->
+		<button onclick="attachGraph()">Attach a Graph</button>
+		<script>
+			function attachGraph() {
+				var name = document.getElementsByName("attachgraph")[0].value;
+				var mode = document.getElementById("graphmode").value;	// rw or r
+				var graph = {
+					"graphname": name,
+					"mode": mode,
+					"type": "attach"
+				};
+				ws.socket.send(JSON.stringify(graph));
+                if (is_list_attachments) {
+                    // click twice for toggle the list attachments
+                    listAttachments();
+                    listAttachments();
+                }
+            }
+		</script>
+	</div>
+
+
+
+	<div>
+        <button onclick="listAttachments()">List Attachments</button>
+		<div class="box">
+			<ul id="attachmentList"></ul>
+		</div>
+<!--		add a button to list graphs by fetching from backend through websocket-->
+		<button onclick="listGraphs()">List Graphs</button>
+		<div class="box">
+		  <ul id="graphList">
+				</ul>
+		</div>
+<!--		add a button to list graphs by fetching from backend through websocket-->
+		<strong> Notifications </strong>
+		<div class="box">
+		  <ul id="notifications"> </ul>
+		</div>
+		<script>
+			function listGraphs() {
+				var graph = {
+					"type": "list"
+				};
+                is_list_graphs ^= 1;
+				ws.socket.send(JSON.stringify(graph));
+			}
+		</script>
+	</div>
+<!-- add a button to open graph-->
+	<div>
+        {% csrf_token %}
+		<input type="text" name="opengraph" placeholder="Graph Name"><br/>
+        <div id="openclosebuttons">
+            <button onclick="openGraph()">Open Graph</button>
+        </div>
+
+		<script>
+			function openGraph() {
+				var name = document.getElementsByName("opengraph")[0].value;
+				var username = document.getElementById('username').value;
+				var graph = {
+					"username": username,
+					"graphname": name,
+					"type": "open"
+				};
+				ws.socket.send(JSON.stringify(graph));
+			}
+            function closeGraph() {
+				var graph = {
+					"type": "close"
+				};
+				ws.socket.send(JSON.stringify(graph));
+                openclosebuttons = document.getElementById("openclosebuttons");
+                openclosebuttons.removeChild(openclosebuttons.lastChild);
+                this.active_graph_name = '';
+            }
+		</script>
+	</div>
+
+<!-- add a button to create newnode-->
+	<div>
+		        {% csrf_token %}
+        <label for="components">Component Type:</label>
+        <select id="components" name="componentname" >
+            <option value="1">Load Image</option>
+            <option value="2">Crop</option>
+            <option value="3">Get Dimensions</option>
+            <option value="4">Rotate</option>
+            <option value="5">Stack</option>
+            <option value="6">HStack</option>
+            <option value="7">Scale</option>
+            <option value="8">Fit</option>
+            <option value="9">Stretch</option>
+            <option value="10">Save Image</option>
+            <option value="11">View Image</option>
+            <option value="12">Dup Image</option>
+        </select>
+		<button onclick="newNode()">Set Parameters</button>
+		<script>
+			function newNode() {
+				var pId = document.getElementById("components").value;
+				// create a dict of params
+				var params = {
+					"1": ["name"],
+					"2": ["x", "y", "width", "height"],
+					"3": [],
+					"4": ["angle"],
+					"5": [],
+					"6": [],
+					"7": ["x"],
+					"8": ["width", "height"],
+					"9": ["width factor", "height factor"],
+					"10": [],
+					"11": [],
+					"12": []
+				};
+				var paramlist = document.getElementById('paramlist');
+				// remove all children of paramlist
+				while (paramlist.firstChild) {
+					paramlist.removeChild(paramlist.firstChild);
+				}
+
+				for(var i in params[pId])
+				{
+
+					if(pId === '1'){
+						loaditem = document.createElement('input');
+						loaditem.setAttribute('accept','image/jpeg, image/png, image/jpg');
+						loaditem.setAttribute('type','file');
+						loaditem.setAttribute('id','image');
+						paramlist.appendChild(loaditem);
+						break;
+					}
+					paramitem = document.createElement('input');
+					paramitem.type = 'text';
+					paramitem.name = params[pId][i];
+					paramitem.placeholder = params[pId][i];
+					paramlist.appendChild(paramitem);
+				}
+					buttonitem = document.createElement('button');
+					buttonitem.type = 'submit';
+					buttonitem.setAttribute('onclick', 'sendParams()');
+					buttonitem.innerHTML='Create Node';
+					paramlist.appendChild(buttonitem);
+			}
+
+            function toBase64(file) {
+				{#debugger;#}
+				return new Promise((resolve, reject) => {
+					const reader = new FileReader();
+					reader.readAsDataURL(file);
+					reader.onload = () => resolve(reader.result);
+					reader.onerror = reject;
+				});
+			}
+
+			async function sendParams()
+			{
+				{#debugger;#}
+				var paramlist = document.getElementById('paramlist');
+				var nodenum = document.getElementsByName("componentname")[0].value;
+				var file_element = document.getElementById('image');
+				params ={};
+				for (var i= 0; i < paramlist.childNodes.length; i++) {
+					var param = paramlist.childNodes[i];
+					var key = param.name;
+					var value = param.value;
+					if (key === "") continue;		// if there is an empty child, discard it
+					params[key] = value;
+				}
+				if (nodenum === "1")
+				{
+					params['file'] = await toBase64(file_element.files[0]);
+				}
+				var username = document.getElementById('username').value;
+				var graph = {
+					"type": "newnode",
+					"nodenum": nodenum,
+					"node_id": "node_id",
+					"username" : username,
+					"msg": params
+				};
+				ws.socket.send(JSON.stringify(graph));
+
+			}
+		</script>
+		<div id="paramlist">
+            {% csrf_token %}
+		</div>
+
+<!--		create a button to list nodes and send it to backend, after that fetch from the backend-->
+		<button onclick="listNodes()">List Nodes</button>
+
+		<div class="box">
+			<ul id="nodeList"></ul>
+		</div>
+
+
+        <script>
+			function listAttachments() {
+				var attachments = {
+					"type": "attachments"
+				};
+                is_list_attachments ^= 1 // toggle the boolean
+				ws.socket.send(JSON.stringify(attachments));
+			}
+		</script>
+		<script>
+			function listNodes() {
+				var graph = {
+					"type": "nodes"
+				};
+                is_list_nodes ^= 1 // toggle the boolean
+				ws.socket.send(JSON.stringify(graph));
+			}
+		</script>
+	</div>
+
+<!--create two input boxes to connect nodes-->
+	<div>
+        {% csrf_token %}
+		<input type="text" name="node1" placeholder="Node 1 ID"><br/>
+		<input type="text" name="node2" placeholder="Node 2 ID"><br/>
+		<button onclick="connectNodes()">Connect Nodes</button>
+		<script>
+			function connectNodes() {
+				var node1 = document.getElementsByName("node1")[0].value;
+				var node2 = document.getElementsByName("node2")[0].value;
+				var graph = {
+					"node1_id": node1,
+					"node2_id": node2,
+					"type": "connect",
+					"graphname": "graphname" // TODO edit graphname
+				};
+				ws.socket.send(JSON.stringify(graph));
+			}
+		</script>
+	</div>
+<!-- create a button to execute the graph -->
+	<div>
+        {% csrf_token %}
+		<button onclick="executeGraph()">Execute Graph</button>
+		<script>
+			function executeGraph() {
+				var graph = {
+					"type": "execute",
+					"graphname": "graphname" // TODO edit graphname
+				};
+				ws.socket.send(JSON.stringify(graph));
+			}
+		</script>
+	</div>
+</body>
+
+</html>

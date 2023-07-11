@@ -1,0 +1,14 @@
+<html>
+
+<body>
+    <h1><strong>Register Page</strong></h1>
+<!--take two inputs as username and password-->
+    <form action="/handle_register" method="post">
+        {% csrf_token %}
+        <input type="text" name="username" placeholder="username"><br/>
+        <input type="password" name="password" placeholder="password"><br/>
+        <input type="submit" value="Register">
+    </form>
+
+</body>
+</html>

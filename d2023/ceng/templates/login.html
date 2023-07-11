@@ -1,0 +1,16 @@
+<html>
+
+<body>
+    <h1><strong>Login Page</strong></h1>
+<!--   print he error if exist -->
+    {% if error %}
+        <p><strong>{{error}}</strong></p>
+    {% endif %}
+    <form action="/handle_login" method="post">
+        {% csrf_token %}
+        <input type="text" name="username" placeholder="username"><br/>
+        <input type="password" name="password" placeholder="password"><br/>
+        <input type="submit" value="Login">
+    </form>
+</body>
+</html>

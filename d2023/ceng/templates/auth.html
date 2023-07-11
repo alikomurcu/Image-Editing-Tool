@@ -1,0 +1,15 @@
+<html>
+
+<body>
+    <h1><strong>Home</strong></h1>
+<!--create two buttons-->
+    <form action="/login" method="post">
+        {% csrf_token %}
+        <input type="submit" value="Login">
+    </form>
+    <form action="/register" method="post">
+        {% csrf_token %}
+        <input type="submit" value="Register">
+    </form>
+</body>
+</html>
